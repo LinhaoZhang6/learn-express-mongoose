@@ -1,32 +1,46 @@
-let async = require('async');
-let Book = require('../models/book');
-let BookInstance = require('../models/bookinstance');
+const async = require('async');
+const Book = require('../models/book');
+const BookInstance = require('../models/bookinstance');
 
-function get_book(id) {
-    if (typeof id !== "string") {
-        return ({status: "error"});
+// Function to get book details by ID
+async function getBook(id) {
+    try {
+        if (typeof id !== "string" || !id.match(/^[0-9a-fA-F]{24}$/)) {
+            throw new Error("Invalid book ID");
+        }
+        const book = await Book.findOne({ '_id': id }).populate('author');
+        return book;
+    } catch (error) {
+        throw new Error("Error fetching book details");
     }
-    return Book.findOne({'_id': {$eq: id}}).populate('author');
 }
 
-function get_book_dtl(id) {
-  return BookInstance
-          .find({ 'book': id })
-          .select('imprint status');
+// Function to get book instances details by book ID
+async function getBookDetails(id) {
+    try {
+        if (typeof id !== "string" || !id.match(/^[0-9a-fA-F]{24}$/)) {
+            throw new Error("Invalid book ID");
+        }
+        const bookInstances = await BookInstance.find({ 'book': id }).select('imprint status');
+        return bookInstances;
+    } catch (error) {
+        throw new Error("Error fetching book instances details");
+    }
 }
 
-exports.show_book_dtls = async (res, id) => {
-  const results = await Promise.all([get_book(id).exec(), get_book_dtl(id).exec()])
-  try {
-    let book = await results[0];
-    let copies = await results[1];
-    res.send({
-      title: book.title,
-      author: book.author.name,
-      copies: copies,
-    });
-  }
-  catch(err) {
-    res.send(`Book ${id} not found`);
-  } 
+// Controller function to show book details
+exports.showBookDetails = async (res, id) => {
+    try {
+        const [book, bookDetails] = await Promise.all([getBook(id), getBookDetails(id)]);
+        if (!book) {
+            throw new Error(`Book ${id} not found`);
+        }
+        res.send({
+            title: book.title,
+            author: book.author.name,
+            copies: bookDetails
+        });
+    } catch (error) {
+        res.send(error.message);
+    }
 }
